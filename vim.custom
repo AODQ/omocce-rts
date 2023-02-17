@@ -1,0 +1,4 @@
+function! MakeprgRelease()
+  let &makeprg = 'cd build-husk/build-install; ninja install'
+  make!
+endfunction

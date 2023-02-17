@@ -1,0 +1,22 @@
+plugins: {
+  graph: {
+    components: [
+      {
+        name: "node-unit",
+        header: "components/include/node-unit.h",
+      },
+    ],
+    systems: [
+      {
+        name: "map-movement",
+        components: [ "node-unit", ],
+        callback-frequency: "update",
+      },
+      {
+        name: "node-unit-render",
+        components: [ "node-unit", ],
+        callback-frequency: "update",
+      },
+    ],
+  },
+},
