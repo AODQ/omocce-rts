@@ -6,7 +6,7 @@ task-graph: [
         action: {
           type: "clear-framebuffer-color",
           command-list-recorder: "main-command-list-recorder",
-          rgba: [0.2, 0.2, 0.2, 1,],
+          rgba: [0.8, 0.2, 0.2, 1,],
           framebuffer: "window-framebuffer",
         },
       },

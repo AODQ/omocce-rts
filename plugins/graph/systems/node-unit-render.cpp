@@ -195,7 +195,6 @@ void systemNodeUnitRenderInitialize() {
 
     auto pipelineInfo = PuleGfxPipelineCreateInfo {
       .shaderModule = ctx.shaderModule,
-      .framebuffer = pul.gfxFramebufferWindow(),
       .layout = &descriptorSetLayout,
       .config = {
         .depthTestEnabled = true,
@@ -342,19 +341,19 @@ void pulcSystemCallbackNodeUnitRender(
       }
     );
   }
-  pul.gfxCommandListAppendAction(
-    recorder,
-    PuleGfxCommand {
-      .dispatchCommandList = {
-        .action = PuleGfxAction_dispatchCommandList,
-        .submitInfo = PuleGfxCommandListSubmitInfo {
-          .commandList = ctx.commandList,
-          .fenceTargetStart = nullptr, // TODO maybe needs fence? MT tho...?
-          .fenceTargetFinish = nullptr,
-        },
-      },
-    }
-  );
+  /* pul.gfxCommandListAppendAction( */
+  /*   recorder, */
+  /*   PuleGfxCommand { */
+  /*     .dispatchCommandList = { */
+  /*       .action = PuleGfxAction_dispatchCommandList, */
+  /*       .submitInfo = PuleGfxCommandListSubmitInfo { */
+  /*         .commandList = ctx.commandList, */
+  /*         .fenceTargetStart = nullptr, // TODO maybe needs fence? MT tho...? */
+  /*         .fenceTargetFinish = nullptr, */
+  /*       }, */
+  /*     }, */
+  /*   } */
+  /* ); */
 }
 
 } // C

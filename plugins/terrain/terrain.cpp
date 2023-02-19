@@ -65,7 +65,6 @@ void initializeContext(
         heights[(ity+1)*height + (itx+1)],
         originStartY + (ity+1)*originItY,
       };
-      puleLog("<%f, %f, %f> -> <%f, %f, %f>", ul.x, ul.y,ul.z, lr.x,lr.y,lr.z);
       attributes.emplace_back(ul);
       attributes.emplace_back(ur);
       attributes.emplace_back(lr);
@@ -111,7 +110,14 @@ void initializeContext(
         void main() {
           vec3 origin = inOrigin;
           gl_Position = (projection * view) * vec4(origin, 1.0f);
-          outUv = vec3(gl_Position.xyz);
+          int triangleID = gl_VertexID/3;
+          outUv = (
+            vec3(
+              triangleID%20/20.0f,
+              triangleID%5/5.0f,
+              mod((triangleID+1), 3.3)/3.3f
+            )
+          );
         }
       ),
       // FRAGMENT
@@ -141,16 +147,15 @@ void initializeContext(
 
     auto pipelineInfo = PuleGfxPipelineCreateInfo {
       .shaderModule = ctx.shaderModule,
-      .framebuffer = pul.gfxFramebufferWindow(),
       .layout = &descriptorSetLayout,
       .config = {
         .depthTestEnabled = true,
         .blendEnabled = false,
         .scissorTestEnabled = false,
         .viewportUl = PuleI32v2 { 0, 0, },
-        .viewportLr = PuleI32v2 { 400, 400, },
+        .viewportLr = PuleI32v2 { 800, 600, },
         .scissorUl = PuleI32v2 { 0, 0, },
-        .scissorLr = PuleI32v2 { 400, 400, },
+        .scissorLr = PuleI32v2 { 800, 600, },
       },
     };
 
@@ -159,15 +164,6 @@ void initializeContext(
       return;
     }
   }
-
-  /* // create command list */
-  /* ctx.commandList = ( */
-    /* pul.gfxCommandListCreate( */
-      /* pul.allocateDefault(), pul.cStr("node-unit-render") */
-    /* ) */
-  /* ); */
-  /* { */
-  /* } */
 }
 
 void terrainRender(
@@ -197,13 +193,13 @@ void terrainRender(
   { // push constant
     PuleF32m44 const view = (
       puleViewLookAt(
-        PuleF32v3{sinf(time)*3.0f, 5.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f},
+        PuleF32v3{sinf(time)*3.0f, 1.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f},
         puleF32v3(0.0),
         PuleF32v3{0.0f, 1.0f, 0.0f}
       )
     );
     PuleF32m44 const proj = (
-      puleProjectionPerspective(90.0f, 1.0f, 0.001f, 1000.0f)
+      puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
     );
     std::vector<PuleGfxConstant> pushConstants = {
       {
@@ -256,8 +252,14 @@ void pulcComponentLoad(PulePluginPayload const payload) {
   );
 
   // TODO load
-  std::vector<float> heights = { 1.0f, 2.0f, 1.0f, 1.0f };
-  initializeContext(heights.data(), 2, 2, false);
+  /* std::vector<float> heights = { 1.0f, 2.0f, 1.0f, 1.0f }; */
+    std::vector<float> defaultTerrainValues;
+    defaultTerrainValues.resize(100*100);
+    for (size_t itx = 0; itx < 100; ++ itx)
+    for (size_t ity = 0; ity < 100; ++ ity) {
+      defaultTerrainValues.emplace_back(1.0f + (itx%20)*5.0f + (ity%50)*6.5f);
+    }
+  initializeContext(defaultTerrainValues.data(), 100, 100, false);
 }
 
 void pulcComponentUpdate(PulePluginPayload const payload) {
@@ -277,7 +279,7 @@ void pulcComponentUpdate(PulePluginPayload const payload) {
     )
   };
 
-  /* ::terrainRender(PuleGfxFramebuffer{0}, recorder); */
+  ::terrainRender(PuleGfxFramebuffer{0}, recorder);
 }
 
 } // extern C
@@ -363,8 +365,8 @@ void guiInitialize() {
     );
     guiImageColor = (
       puleGfxGpuImageCreate({
-        .width = 400,
-        .height = 400,
+        .width = 800,
+        .height = 600,
         .target = PuleGfxImageTarget_i2D,
         .byteFormat = PuleGfxImageByteFormat_rgba8U,
         .sampler = sampler,
@@ -373,8 +375,8 @@ void guiInitialize() {
     );
     guiImageDepth = (
       puleGfxGpuImageCreate({
-        .width = 400,
-        .height = 400,
+        .width = 800,
+        .height = 600,
         .target = PuleGfxImageTarget_i2D,
         .byteFormat = PuleGfxImageByteFormat_depth16,
         .sampler = sampler,
@@ -390,7 +392,7 @@ void guiInitialize() {
       .image = guiImageDepth, .mipmapLevel = 0,
     };
     PuleError err = puleError();
-    puleGfxFramebufferCreate(fbci, &err);
+    guiFramebuffer = puleGfxFramebufferCreate(fbci, &err);
     if (puleErrorConsume(&err)) { return; }
   }
 }
@@ -412,6 +414,26 @@ void puldGuiEditor(
   }
 
   pul.gfxCommandListRecorderReset(guiCommandListRecorder);
+  pul.gfxCommandListAppendAction(
+    guiCommandListRecorder,
+    PuleGfxCommand {
+      .clearFramebufferColor = {
+        .action = PuleGfxAction_clearFramebufferColor,
+        .framebuffer = guiFramebuffer,
+        .color = PuleF32v4(0.2f, 0.6f, 0.2f, 1.0f),
+      },
+    }
+  );
+  pul.gfxCommandListAppendAction(
+    guiCommandListRecorder,
+    PuleGfxCommand {
+      .clearFramebufferDepth = {
+        .action = PuleGfxAction_clearFramebufferDepth,
+        .framebuffer = guiFramebuffer,
+        .depth = 1.0f,
+      },
+    }
+  );
   ::terrainRender(guiFramebuffer, guiCommandListRecorder);
   pul.gfxCommandListRecorderFinish(guiCommandListRecorder);
   PuleError err = pul.error();
