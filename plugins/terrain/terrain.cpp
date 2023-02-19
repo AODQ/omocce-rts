@@ -402,7 +402,7 @@ void guiInitialize() {
 extern "C" {
 void puldGuiEditor(
   [[maybe_unused]] PuleAllocator const allocator,
-  [[maybe_unused]] PulePlatform const platform,
+  PulePlatform const platform,
   PuleEngineLayer const pulLayer
 ) {
   ::pul = pulLayer;
@@ -420,7 +420,7 @@ void puldGuiEditor(
       .clearFramebufferColor = {
         .action = PuleGfxAction_clearFramebufferColor,
         .framebuffer = guiFramebuffer,
-        .color = PuleF32v4(0.2f, 0.6f, 0.2f, 1.0f),
+        .color = PuleF32v4(0.2f, 0.3f, 0.2f, 1.0f),
       },
     }
   );
@@ -447,12 +447,16 @@ void puldGuiEditor(
   );
   if (pul.errorConsume(&err)) { return; }
 
+  PuleI32v2 mouseOrigin = (
+    pul.i32v2Sub(pulePlatformMouseOrigin(platform), puleImguiCurrentOrigin())
+  );
   pul.imguiImage(
     guiImageColor, PuleF32v2{400, 400}, pul.f32v2(0), pul.f32v2(1),
     pul.f32v4(1)
   );
+  puleImguiText("Mouse origin <%u, %u> %s)", mouseOrigin.x, mouseOrigin.y,
+    pul.imguiLastItemHovered() ? "hovered" : "");
   if (pul.imguiLastItemHovered()) {
-    pul.imguiText("hovered");
   }
 
   pul.imguiWindowEnd();
