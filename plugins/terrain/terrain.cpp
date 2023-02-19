@@ -168,7 +168,9 @@ void initializeContext(
 
 void terrainRender(
   PuleGfxFramebuffer const framebuffer,
-  PuleGfxCommandListRecorder const recorder
+  PuleGfxCommandListRecorder const recorder,
+  PuleF32m44 const view,
+  PuleF32m44 const proj
 ) {
   pul.gfxCommandListAppendAction(
     recorder,
@@ -188,19 +190,7 @@ void terrainRender(
       },
     }
   );
-  static float time = 0.0f;
-  time += 1.0f/60.0f;
   { // push constant
-    PuleF32m44 const view = (
-      puleViewLookAt(
-        PuleF32v3{sinf(time)*3.0f, 1.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f},
-        puleF32v3(0.0),
-        PuleF32v3{0.0f, 1.0f, 0.0f}
-      )
-    );
-    PuleF32m44 const proj = (
-      puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
-    );
     std::vector<PuleGfxConstant> pushConstants = {
       {
         .value = { .constantF32m44 = view, },
@@ -279,7 +269,19 @@ void pulcComponentUpdate(PulePluginPayload const payload) {
     )
   };
 
-  ::terrainRender(PuleGfxFramebuffer{0}, recorder);
+  static float time = 0.0f;
+  time += 1.0f/60.0f;
+    PuleF32m44 const view = (
+      puleViewLookAt(
+        PuleF32v3{sinf(time)*3.0f, 1.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f},
+        puleF32v3(0.0),
+        PuleF32v3{0.0f, 1.0f, 0.0f}
+      )
+    );
+    PuleF32m44 const proj = (
+      puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
+    );
+  ::terrainRender(PuleGfxFramebuffer{0}, recorder, view, proj);
 }
 
 } // extern C
@@ -434,7 +436,21 @@ void puldGuiEditor(
       },
     }
   );
-  ::terrainRender(guiFramebuffer, guiCommandListRecorder);
+
+  static PuleF32v2 mouseRel = puleF32v2(0.0f);
+
+  PuleF32m44 const view = (
+    puleViewLookAt(
+      PuleF32v3{sinf(mouseRel.x/100.0f)*3.0f, -2.0f + mouseRel.y/200.0f, cosf(mouseRel.x/100.0f)*3.0f},
+      puleF32v3(0.0),
+      PuleF32v3{0.0f, 1.0f, 0.0f}
+    )
+  );
+  PuleF32m44 const proj = (
+    puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
+  );
+
+  ::terrainRender(guiFramebuffer, guiCommandListRecorder, view, proj);
   pul.gfxCommandListRecorderFinish(guiCommandListRecorder);
   PuleError err = pul.error();
   pul.gfxCommandListSubmit(
@@ -454,9 +470,9 @@ void puldGuiEditor(
     guiImageColor, PuleF32v2{400, 400}, pul.f32v2(0), pul.f32v2(1),
     pul.f32v4(1)
   );
-  puleImguiText("Mouse origin <%u, %u> %s)", mouseOrigin.x, mouseOrigin.y,
-    pul.imguiLastItemHovered() ? "hovered" : "");
   if (pul.imguiLastItemHovered()) {
+    mouseRel.x = mouseOrigin.x;
+    mouseRel.y = mouseOrigin.y;
   }
 
   pul.imguiWindowEnd();
