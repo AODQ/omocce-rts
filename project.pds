@@ -69,6 +69,7 @@ build-info: {
         "pulchritude-ecs",
         "pulchritude-error",
         "pulchritude-gfx",
+        "pulchritude-imgui",
         "pulchritude-log",
         "pulchritude-math",
         "pulchritude-platform",
