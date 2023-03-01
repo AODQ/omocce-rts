@@ -169,8 +169,7 @@ void initializeContext(
 void terrainRender(
   PuleGfxFramebuffer const framebuffer,
   PuleGfxCommandListRecorder const recorder,
-  PuleF32m44 const view,
-  PuleF32m44 const proj
+  PuleGfxGpuBuffer const cameraUniformBuffer
 ) {
   pul.gfxCommandListAppendAction(
     recorder,
@@ -191,18 +190,6 @@ void terrainRender(
     }
   );
   { // push constant
-    std::vector<PuleGfxConstant> pushConstants = {
-      {
-        .value = { .constantF32m44 = view, },
-        .typeTag = PuleGfxConstantTypeTag_f32m44,
-        .bindingSlot = 0,
-      },
-      {
-        .value = { .constantF32m44 = proj, },
-        .typeTag = PuleGfxConstantTypeTag_f32m44,
-        .bindingSlot = 1,
-      },
-    };
     pul.gfxCommandListAppendAction(
       recorder,
       PuleGfxCommand {
@@ -281,7 +268,7 @@ void pulcComponentUpdate(PulePluginPayload const payload) {
     PuleF32m44 const proj = (
       puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
     );
-  ::terrainRender(PuleGfxFramebuffer{0}, recorder, view, proj);
+  /* ::terrainRender(PuleGfxFramebuffer{0}, recorder, view, proj); */
 }
 
 } // extern C
@@ -296,13 +283,21 @@ PuleGfxGpuImage guiImageColor;
 PuleGfxGpuImage guiImageDepth;
 PuleGfxCommandList guiCommandList;
 PuleGfxCommandListRecorder guiCommandListRecorder;
+PuleCamera guiCamera;
+PuleCameraSet guiCameraSet;
+PuleCameraController guiCameraController;
 std::vector<float> guiHeightmap;
 void * guiMappedAttributes;
 
-void guiInitialize() {
+void guiInitialize(PulePlatform const platform) {
   static bool initialized = false;
   if (initialized) { return; }
   initialized = true;
+
+  guiCamera = puleCameraCreate();
+  guiCameraController = puleCameraControllerFirstPerson(platform, guiCamera);
+  guiCameraSet = puleCameraSetCreate();
+  puleCameraSetAdd(guiCamera);
 
   PuleDsValue const dsTerrain = puleDsCreateObject(puleAllocateDefault());
   { // store default terrain
@@ -408,12 +403,18 @@ void puldGuiEditor(
   PuleEngineLayer const pulLayer
 ) {
   ::pul = pulLayer;
-  guiInitialize();
+  guiInitialize(platform);
   static bool open = true;
   pul.imguiWindowBegin("terrain", &open);
   if (!open) {
     return;
   }
+
+  puleCameraControllerPollEvents();
+  PuleGfxGpuBuffer const cameraBuffer = (
+    puleCameraSetGfxUniformBuffer(guiCameraSet)
+  );
+  puleCameraSetRefresh(guiCameraSet);
 
   pul.gfxCommandListRecorderReset(guiCommandListRecorder);
   pul.gfxCommandListAppendAction(
@@ -441,7 +442,9 @@ void puldGuiEditor(
 
   PuleF32m44 const view = (
     puleViewLookAt(
-      PuleF32v3{sinf(mouseRel.x/100.0f)*3.0f, -2.0f + mouseRel.y/200.0f, cosf(mouseRel.x/100.0f)*3.0f},
+      PuleF32v3{sinf(mouseRel.x/100.0f)*3.0f,
+      -2.0f + mouseRel.y/200.0f,
+      cosf(mouseRel.x/100.0f)*3.0f},
       puleF32v3(0.0),
       PuleF32v3{0.0f, 1.0f, 0.0f}
     )
