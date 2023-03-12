@@ -102,14 +102,21 @@ void initializeContext(
         /* in layout(location = 1) vec2 inUv; */
         /* in layout(location = 2) vec4 inNormal; */
 
-        uniform layout(location = 0) mat4 view;
-        uniform layout(location = 1) mat4 projection;
+        struct Camera {
+          mat4 proj;
+          mat4 view;
+        };
+        layout(std140, binding = 0) uniform CameraSet {
+          int cameraCount;
+          Camera cameras[];
+        } cameraSet;
 
         out layout(location = 0) vec3 outUv;
 
         void main() {
           vec3 origin = inOrigin;
-          gl_Position = (projection * view) * vec4(origin, 1.0f);
+          const Camera cam = cameraSet.cameras[0];
+          gl_Position = vec4(origin, 1.0f);
           int triangleID = gl_VertexID/3;
           outUv = (
             vec3(
@@ -189,18 +196,19 @@ void terrainRender(
       },
     }
   );
-  { // push constant
-    pul.gfxCommandListAppendAction(
-      recorder,
-      PuleGfxCommand {
-        .pushConstants = {
-          .action = PuleGfxAction_pushConstants,
-          .constants = pushConstants.data(),
-          .constantsLength = pushConstants.size(),
-        },
-      }
-    );
-  }
+  pul.gfxCommandListAppendAction(
+    recorder,
+    PuleGfxCommand {
+      .bindBuffer = {
+        .action = PuleGfxAction_bindBuffer,
+        .usage = PuleGfxGpuBufferUsage_bufferUniform,
+        .bindingIndex = 0,
+        .buffer = cameraUniformBuffer,
+        .offset = 0,
+        .byteLen = sizeof(PuleF32m44)*2 + 4,
+      },
+    }
+  );
 
   pul.gfxCommandListAppendAction(
     recorder,
@@ -240,34 +248,35 @@ void pulcComponentLoad(PulePluginPayload const payload) {
 }
 
 void pulcComponentUpdate(PulePluginPayload const payload) {
-  auto const taskGraph = PuleTaskGraph {
-    .id = pul.pluginPayloadFetchU64(
-      payload,
-      pul.cStr("pule-render-task-graph")
-    ),
-  };
-  PuleTaskGraphNode const renderGeometryNode = (
-    pul.taskGraphNodeFetch(taskGraph, pul.cStr("render-geometry"))
-  );
-  auto const recorder = PuleGfxCommandListRecorder {
-    pul.taskGraphNodeAttributeFetchU64(
-      renderGeometryNode,
-      pul.cStr("command-list-primary-recorder")
-    )
-  };
+(void)payload;
+  /* auto const taskGraph = PuleTaskGraph { */
+  /*   .id = pul.pluginPayloadFetchU64( */
+  /*     payload, */
+  /*     pul.cStr("pule-render-task-graph") */
+  /*   ), */
+  /* }; */
+  /* PuleTaskGraphNode const renderGeometryNode = ( */
+  /*   pul.taskGraphNodeFetch(taskGraph, pul.cStr("render-geometry")) */
+  /* ); */
+  /* auto const recorder = PuleGfxCommandListRecorder { */
+  /*   pul.taskGraphNodeAttributeFetchU64( */
+  /*     renderGeometryNode, */
+  /*     pul.cStr("command-list-primary-recorder") */
+  /*   ) */
+  /* }; */
 
-  static float time = 0.0f;
-  time += 1.0f/60.0f;
-    PuleF32m44 const view = (
-      puleViewLookAt(
-        PuleF32v3{sinf(time)*3.0f, 1.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f},
-        puleF32v3(0.0),
-        PuleF32v3{0.0f, 1.0f, 0.0f}
-      )
-    );
-    PuleF32m44 const proj = (
-      puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
-    );
+  /* static float time = 0.0f; */
+  /* time += 1.0f/60.0f; */
+  /*   PuleF32m44 const view = ( */
+  /*     puleViewLookAt( */
+  /*       PuleF32v3{sinf(time)*3.0f, 1.0f + 0.5f*cosf(time*0.5f), cosf(time)*3.0f}, */
+  /*       puleF32v3(0.0), */
+  /*       PuleF32v3{0.0f, 1.0f, 0.0f} */
+  /*     ) */
+  /*   ); */
+  /*   PuleF32m44 const proj = ( */
+  /*     puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f) */
+  /*   ); */
   /* ::terrainRender(PuleGfxFramebuffer{0}, recorder, view, proj); */
 }
 
@@ -296,8 +305,8 @@ void guiInitialize(PulePlatform const platform) {
 
   guiCamera = puleCameraCreate();
   guiCameraController = puleCameraControllerFirstPerson(platform, guiCamera);
-  guiCameraSet = puleCameraSetCreate();
-  puleCameraSetAdd(guiCamera);
+  guiCameraSet = puleCameraSetCreate(puleCStr("gui"));
+  puleCameraSetAdd(guiCameraSet, guiCamera);
 
   PuleDsValue const dsTerrain = puleDsCreateObject(puleAllocateDefault());
   { // store default terrain
@@ -411,10 +420,10 @@ void puldGuiEditor(
   }
 
   puleCameraControllerPollEvents();
+  puleCameraSetRefresh(guiCameraSet);
   PuleGfxGpuBuffer const cameraBuffer = (
     puleCameraSetGfxUniformBuffer(guiCameraSet)
   );
-  puleCameraSetRefresh(guiCameraSet);
 
   pul.gfxCommandListRecorderReset(guiCommandListRecorder);
   pul.gfxCommandListAppendAction(
@@ -453,7 +462,7 @@ void puldGuiEditor(
     puleProjectionPerspective(90.0f, 800.0f/600.0f, 0.001f, 1000.0f)
   );
 
-  ::terrainRender(guiFramebuffer, guiCommandListRecorder, view, proj);
+  ::terrainRender(guiFramebuffer, guiCommandListRecorder, cameraBuffer);
   pul.gfxCommandListRecorderFinish(guiCommandListRecorder);
   PuleError err = pul.error();
   pul.gfxCommandListSubmit(
